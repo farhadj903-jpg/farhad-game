@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>شتر جهنده</title>
+<style>
+  :root{
+    --sky-top:#6fc6e6; --sky-bottom:#fdebc7;
+    --sand-1:#e9cf9e; --sand-2:#c9a46a;
+    --ink:#3a2a1e; --ink-soft:#6b5643;
+    --card:#fff7ea; --card-border:#d9b783;
+    --accent:#d9773f; --accent-dark:#b95c28;
+    --coin:#e8b23d;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#000;
+    font-family:Tahoma, "Vazirmatn", "Segoe UI", sans-serif;}
+  #app{position:relative;width:100%;height:100%;
+    padding-top:env(safe-area-inset-top,0px);
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    background:linear-gradient(#333,#111);}
+  canvas{display:block;width:100%;height:100%;touch-action:none;}
+
+  #hud{position:absolute;top:calc(env(safe-area-inset-top,0px) + 10px);left:0;right:0;
+    display:flex;justify-content:space-between;align-items:center;padding:0 14px;
+    pointer-events:none; z-index:5;}
+  #scoreBox{background:rgba(58,42,30,.55);color:#fff8ec;padding:6px 14px;border-radius:999px;
+    font-size:18px;font-weight:bold;letter-spacing:.5px;}
+  #muteBtn{pointer-events:all;border:none;background:rgba(58,42,30,.55);color:#fff8ec;
+    width:38px;height:38px;border-radius:999px;font-size:18px;cursor:pointer;}
+
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;text-align:center;gap:10px;z-index:10;
+    background:linear-gradient(180deg, rgba(58,42,30,.35), rgba(58,42,30,.65));
+    padding:24px;}
+  .overlay.hidden{display:none;}
+  .panel{background:var(--card);border:3px solid var(--card-border);border-radius:22px;
+    padding:26px 30px;max-width:340px;width:100%;box-shadow:0 10px 0 rgba(0,0,0,.15);}
+  .panel h1{margin:0 0 6px;font-size:30px;color:var(--ink);}
+  .panel h2{margin:0 0 6px;font-size:24px;color:var(--accent-dark);}
+  .panel p{margin:4px 0;color:var(--ink-soft);font-size:15px;}
+  .panel .best{font-weight:bold;color:var(--ink);}
+  .btn{margin-top:14px;border:none;border-radius:14px;background:var(--accent);
+    color:#fff8ec;font-size:19px;font-weight:bold;padding:14px 26px;cursor:pointer;
+    box-shadow:0 5px 0 var(--accent-dark);width:100%;}
+  .btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--accent-dark);}
+  .hint{font-size:13px;color:var(--ink-soft);margin-top:8px;}
+
+  #bannerAdSlot{position:absolute;left:0;right:0;bottom:0;height:0;
+    background:rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:12px;z-index:4;}
+  /* برای فعال‌سازی تبلیغ بنری واقعی، ارتفاع بالا را متناسب با بنر (مثلا 50px) تغییر دهید
+     و کد نمایش تبلیغ SDK را همینجا اضافه کنید. */
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --card:#2b241c; --card-border:#4a3c2c; --ink:#f3e9d8; --ink-soft:#cbb999; }
+  }
+  :root[data-theme="dark"]{ --card:#2b241c; --card-border:#4a3c2c; --ink:#f3e9d8; --ink-soft:#cbb999; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="scoreBox">امتیاز: <span id="score">0</span></div>
+    <button id="muteBtn" aria-label="صدا">🔊</button>
+  </div>
+
+  <div id="startScreen" class="overlay">
+    <div class="panel">
+      <h1>🐫 شتر جهنده</h1>
+      <p>برای پریدن روی صفحه ضربه بزن و از موانع صحرا رد شو</p>
+      <p>بهترین امتیاز: <span class="best" id="bestStart">0</span></p>
+      <button class="btn" id="startBtn">شروع بازی</button>
+      <div class="hint">هرچه جلوتر بروی، سرعت بیشتر می‌شود!</div>
+    </div>
+  </div>
+
+  <div id="gameOverScreen" class="overlay hidden">
+    <div class="panel">
+      <h2>باختی!</h2>
+      <p>امتیاز شما: <span class="best" id="finalScore">0</span></p>
+      <p>بهترین امتیاز: <span class="best" id="bestEnd">0</span></p>
+      <button class="btn" id="restartBtn">دوباره بازی</button>
+    </div>
+    <!-- محل نمایش تبلیغ بین‌مرحله‌ای (Interstitial) — به تابع showInterstitialPlaceholder در game.js نگاه کنید -->
+  </div>
+
+  <div id="bannerAdSlot"></div>
+</div>
+
+<script>
+/* ===================== تنظیمات کلی ===================== */
+var STORAGE_BEST   = 'camelRun_best';
+var STORAGE_MUTE   = 'camelRun_muted';
+var STORAGE_NOADS  = 'camelRun_removeAds'; // بعدا برای خرید درون‌برنامه‌ای "حذف تبلیغات" استفاده کن
+
+var canvas = document.getElementById('game');
+var ctx = canvas.getContext('2d');
+var DPR = Math.max(1, window.devicePixelRatio || 1);
+var W = 0, H = 0, GROUND_Y = 0;
+
+function resize(){
+  W = canvas.clientWidth = window.innerWidth;
+  H = canvas.clientHeight = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  GROUND_Y = H * 0.78;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ===================== صدا (بدون فایل صوتی، تولید شده با کد) ===================== */
+var audioCtx = null;
+var muted = localStorage.getItem(STORAGE_MUTE) === '1';
+function ensureAudio(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+  }
+}
+function beep(freq, dur, type){
+  if(muted || !audioCtx) return;
+  try{
+    var o = audioCtx.createOscillator();
+    var g = audioCtx.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.value = 0.12;
+    o.connect(g); g.connect(audioCtx.destination);
+    var t = audioCtx.currentTime;
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.start(t); o.stop(t + dur);
+  }catch(e){}
+}
+function sndJump(){ beep(520, .12, 'square'); }
+function sndCoin(){ beep(880, .10, 'triangle'); setTimeout(function(){beep(1200,.08,'triangle');},60); }
+function sndHit(){ beep(140, .35, 'sawtooth'); }
+
+var muteBtn = document.getElementById('muteBtn');
+function refreshMuteBtn(){ muteBtn.textContent = muted ? '🔇' : '🔊'; }
+refreshMuteBtn();
+muteBtn.addEventListener('click', function(e){
+  e.stopPropagation();
+  muted = !muted;
+  localStorage.setItem(STORAGE_MUTE, muted ? '1' : '0');
+  refreshMuteBtn();
+});
+
+/* ===================== وضعیت بازی ===================== */
+var state = 'start'; // start | playing | gameover
+var best = parseInt(localStorage.getItem(STORAGE_BEST) || '0', 10);
+document.getElementById('bestStart').textContent = best;
+
+var camel, obstacles, coins, distance, gameSpeed, spawnTimer, coinTimer, playCount = 0;
+
+function resetGame(){
+  camel = { x: W*0.18, y: GROUND_Y, vy: 0, w: 64, h: 46, jumping:false, legPhase:0 };
+  obstacles = [];
+  coins = [];
+  distance = 0;
+  gameSpeed = 6.2;
+  spawnTimer = 60;
+  coinTimer = 90;
+}
+resetGame();
+
+/* سختی تدریجی: سرعت و فاصله موانع بر اساس امتیاز (distance) تغییر می‌کند */
+function currentSpeed(){ return Math.min(6.2 + distance*0.0035, 13.5); }
+function currentGapRange(){
+  var minGap = Math.max(230 - distance*0.06, 120);
+  var maxGap = Math.max(380 - distance*0.06, 200);
+  return [minGap, maxGap];
+}
+
+/* ===================== ورودی لمسی / کلیک / کیبورد ===================== */
+function doJump(){
+  ensureAudio();
+  if(state === 'start'){ startGame(); return; }
+  if(state === 'gameover'){ return; }
+  if(state === 'playing' && !camel.jumping){
+    camel.vy = -15.5;
+    camel.jumping = true;
+    sndJump();
+  }
+}
+canvas.addEventListener('pointerdown', doJump);
+document.getElementById('startScreen').addEventListener('pointerdown', function(){});
+window.addEventListener('keydown', function(e){
+  if(e.code === 'Space'){ e.preventDefault(); doJump(); }
+});
+
+document.getElementById('startBtn').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
+document.getElementById('restartBtn').addEventListener('click', function(e){ e.stopPropagation(); startGame(); });
+
+function startGame(){
+  ensureAudio();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  resetGame();
+  state = 'playing';
+}
+
+function endGame(){
+  state = 'gameover';
+  sndHit();
+  var score = Math.floor(distance/10);
+  if(score > best){ best = score; localStorage.setItem(STORAGE_BEST, String(best)); }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('bestEnd').textContent = best;
+  document.getElementById('gameOverScreen').classList.remove('hidden');
+
+  playCount++;
+  if(playCount % 3 === 0){ showInterstitialPlaceholder(); }
+}
+
+/* ===================== محل تبلیغات (Placeholder) ===================== */
+/* این توابع فعلا فقط جای‌نگهدار هستند تا بعدا با کد واقعی تبلیغات جایگزین شوند */
+function adsRemoved(){ return localStorage.getItem(STORAGE_NOADS) === '1'; }
+function showInterstitialPlaceholder(){
+  if(adsRemoved()) return;
+  // TODO: اینجا کد نمایش تبلیغ بین‌مرحله‌ای (Interstitial Ad) خود را قرار بده
+  console.log('[Ads] نمایش تبلیغ بین‌مرحله‌ای (نمونه)');
+}
+function showRewardedPlaceholder(onFinish){
+  if(adsRemoved()){ onFinish(); return; }
+  // TODO: اینجا کد نمایش تبلیغ جایزه‌ای (Rewarded Ad) خود را قرار بده و بعد از پایان onFinish() را صدا بزن
+  console.log('[Ads] نمایش تبلیغ جایزه‌ای (نمونه)');
+  onFinish();
+}
+function showBannerPlaceholder(){
+  if(adsRemoved()) return;
+  // TODO: اینجا کد نمایش تبلیغ بنری خود را قرار بده و ارتفاع #bannerAdSlot را در CSS تغییر بده
+}
+
+/* ===================== رسم پس‌زمینه (روز تا غروب بر اساس پیشرفت) ===================== */
+function skyColors(){
+  var p = Math.min(distance/4000, 1); // 0 = صبح, 1 = غروب
+  function lerp(a,b,t){return a+(b-a)*t;}
+  function hex2rgb(h){h=h.replace('#','');return [parseInt(h.substr(0,2),16),parseInt(h.substr(2,2),16),parseInt(h.substr(4,2),16)];}
+  var top1=hex2rgb('6fc6e6'), top2=hex2rgb('2b3a67');
+  var bot1=hex2rgb('fdebc7'), bot2=hex2rgb('e4794a');
+  var top=[0,1,2].map(function(i){return lerp(top1[i],top2[i],p);});
+  var bot=[0,1,2].map(function(i){return lerp(bot1[i],bot2[i],p);});
+  return {
+    top:'rgb('+top.join(',')+')',
+    bottom:'rgb('+bot.join(',')+')'
+  };
+}
+
+var duneOffset1 = 0, duneOffset2 = 0;
+function drawBackground(){
+  var sc = skyColors();
+  var g = ctx.createLinearGradient(0,0,0,GROUND_Y);
+  g.addColorStop(0, sc.top);
+  g.addColorStop(1, sc.bottom);
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,GROUND_Y+2);
+
+  // زمین
+  ctx.fillStyle = '#c9a46a';
+  ctx.fillRect(0, GROUND_Y, W, H-GROUND_Y);
+  ctx.fillStyle = '#b8935a';
+  ctx.fillRect(0, GROUND_Y, W, 6);
+
+  // خطوط شن متحرک برای حس حرکت
+  duneOffset1 = (duneOffset1 - gameSpeed*0.5) % 60;
+  ctx.strokeStyle = 'rgba(90,60,30,.25)';
+  ctx.lineWidth = 3;
+  for(var x = duneOffset1; x < W; x += 60){
+    ctx.beginPath();
+    ctx.moveTo(x, GROUND_Y+18);
+    ctx.lineTo(x+30, GROUND_Y+18);
+    ctx.stroke();
+  }
+}
+
+/* ===================== شتر ===================== */
+function updateCamel(){
+  camel.vy += 0.85; // gravity
+  camel.y += camel.vy;
+  if(camel.y > GROUND_Y){
+    camel.y = GROUND_Y;
+    camel.vy = 0;
+    camel.jumping = false;
+  }
+  camel.legPhase += camel.jumping ? 0 : 0.35;
+}
+function drawCamel(){
+  var x = camel.x, y = camel.y, w = camel.w, h = camel.h;
+  var legSwing = Math.sin(camel.legPhase) * 8;
+  ctx.save();
+  ctx.translate(x, y);
+  // سایه
+  ctx.fillStyle = 'rgba(0,0,0,.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, w*0.42, 7, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // پاها
+  ctx.strokeStyle = '#8b5e34';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-w*0.18, -6); ctx.lineTo(-w*0.18 + legSwing*0.4, -h*0.45); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w*0.12, -6); ctx.lineTo(w*0.12 - legSwing*0.4, -h*0.45); ctx.stroke();
+
+  // بدن
+  ctx.fillStyle = '#c99a63';
+  ctx.beginPath();
+  ctx.ellipse(0, -h*0.55, w*0.42, h*0.32, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // کوهان
+  ctx.beginPath();
+  ctx.ellipse(-w*0.05, -h*0.82, w*0.2, h*0.22, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // گردن و سر
+  ctx.strokeStyle = '#c99a63';
+  ctx.lineWidth = 14;
+  ctx.beginPath();
+  ctx.moveTo(w*0.32, -h*0.6);
+  ctx.lineTo(w*0.5, -h*1.05);
+  ctx.stroke();
+  ctx.fillStyle = '#c99a63';
+  ctx.beginPath();
+  ctx.ellipse(w*0.54, -h*1.12, 12, 9, 0.4, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/* ===================== موانع (کاکتوس/سنگ) ===================== */
+function spawnObstacle(){
+  var type = Math.random() < 0.6 ? 'cactus' : 'rock';
+  var h = type === 'cactus' ? (36 + Math.random()*26) : (26 + Math.random()*14);
+  var w = type === 'cactus' ? 22 : 34;
+  obstacles.push({ x: W + 40, y: GROUND_Y, w: w, h: h, type: type });
+}
+function drawObstacle(o){
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  if(o.type === 'cactus'){
+    ctx.fillStyle = '#4f7942';
+    ctx.fillRect(-o.w/2, -o.h, o.w, o.h);
+    ctx.fillRect(-o.w/2-8, -o.h*0.6, 8, o.h*0.35);
+    ctx.fillRect(o.w/2, -o.h*0.75, 8, o.h*0.35);
+  } else {
+    ctx.fillStyle = '#8a8478';
+    ctx.beginPath();
+    ctx.moveTo(-o.w/2, 0);
+    ctx.lineTo(-o.w/2+4, -o.h);
+    ctx.lineTo(o.w/2-6, -o.h*0.85);
+    ctx.lineTo(o.w/2, 0);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ===================== سکه‌ها ===================== */
+function spawnCoin(){
+  coins.push({ x: W + 40, y: GROUND_Y - 70 - Math.random()*50, r: 10, taken:false });
+}
+function drawCoin(c){
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  ctx.fillStyle = '#e8b23d';
+  ctx.beginPath(); ctx.arc(0,0,c.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#b9862a'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+}
+
+/* ===================== برخورد ===================== */
+function hitTest(o){
+  var cx = camel.x, cy = camel.y - camel.h*0.55;
+  var boxW = camel.w*0.55, boxH = camel.h*0.75;
+  var ox = o.x, oy = o.y - o.h/2;
+  return Math.abs(cx-ox) < (boxW/2 + o.w/2) && Math.abs(cy-oy) < (boxH/2 + o.h/2);
+}
+function coinHitTest(c){
+  var dx = camel.x - c.x, dy = (camel.y - camel.h*0.6) - c.y;
+  return Math.sqrt(dx*dx+dy*dy) < (c.r + camel.w*0.3);
+}
+
+/* ===================== حلقه اصلی بازی ===================== */
+var scoreEl = document.getElementById('score');
+var lastScoreShown = -1;
+
+function update(){
+  if(state !== 'playing') return;
+  gameSpeed = currentSpeed();
+  distance += gameSpeed;
+
+  updateCamel();
+
+  spawnTimer -= gameSpeed;
+  if(spawnTimer <= 0){
+    spawnObstacle();
+    var range = currentGapRange();
+    spawnTimer = range[0] + Math.random()*(range[1]-range[0]);
+  }
+  coinTimer -= gameSpeed;
+  if(coinTimer <= 0){
+    spawnCoin();
+    coinTimer = 260 + Math.random()*200;
+  }
+
+  for(var i=obstacles.length-1;i>=0;i--){
+    var o = obstacles[i];
+    o.x -= gameSpeed;
+    if(o.x < -60) obstacles.splice(i,1);
+    else if(hitTest(o)){ endGame(); return; }
+  }
+  for(var j=coins.length-1;j>=0;j--){
+    var c = coins[j];
+    c.x -= gameSpeed;
+    if(c.x < -30) coins.splice(j,1);
+    else if(!c.taken && coinHitTest(c)){
+      c.taken = true;
+      coins.splice(j,1);
+      distance += 50;
+      sndCoin();
+    }
+  }
+
+  var score = Math.floor(distance/10);
+  if(score !== lastScoreShown){
+    scoreEl.textContent = score;
+    lastScoreShown = score;
+  }
+}
+
+function draw(){
+  drawBackground();
+  coins.forEach(drawCoin);
+  obstacles.forEach(drawObstacle);
+  drawCamel();
+}
+
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden && state === 'playing'){
+    // جلوگیری از پرش ناگهانی بعد از برگشت به برنامه
+    camel.vy = 0;
+  }
+});
+</script>
+</body>
+</html>
