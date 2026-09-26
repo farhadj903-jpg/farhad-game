@@ -1,0 +1,18 @@
+{
+  "name": "camel-run",
+  "displayName": "شتر جهنده",
+  "version": "1.0.0",
+  "description": "بازی موبایلی شتر جهنده - قابل انتشار در کافه‌بازار",
+  "main": "www/index.html",
+  "scripts": {
+    "android": "cordova run android",
+    "build-apk": "cordova build android",
+    "build-release": "cordova build android --release"
+  },
+  "devDependencies": {
+    "cordova-android": "^13.0.0"
+  },
+  "cordova": {
+    "platforms": ["android"]
+  }
+}
