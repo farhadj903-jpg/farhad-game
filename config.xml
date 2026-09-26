@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="ir.yourname.camelrun" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>شتر جهنده</name>
+    <description>
+        یک بازی ساده و سرگرم‌کننده: با شتر خود از موانع صحرا رد شو و امتیاز بگیر!
+    </description>
+    <author email="you@example.com" href="https://example.com">
+        نام شما
+    </author>
+
+    <content src="index.html" />
+
+    <access origin="*" />
+    <allow-intent href="http://*/*" />
+    <allow-intent href="https://*/*" />
+
+    <preference name="Orientation" value="portrait" />
+    <preference name="Fullscreen" value="true" />
+    <preference name="BackgroundColor" value="0xff111111" />
+    <preference name="android-minSdkVersion" value="22" />
+    <preference name="android-targetSdkVersion" value="34" />
+    <preference name="AndroidXEnabled" value="true" />
+
+    <platform name="android">
+        <allow-intent href="market:*" />
+        <!--
+          آیکون و اسپلش‌اسکرین:
+          یک آیکون مربعی 1024x1024 پیکسل بساز و در پوشه res/icon.png بگذار،
+          سپس دستور زیر را در ترمینال اجرا کن تا همه سایزها به‌صورت خودکار ساخته شوند:
+
+              npx cordova-res android --skip-config --copy
+
+          یا به‌صورت دستی فایل‌های آیکون را داخل پوشه
+          platforms/android/app/src/main/res/mipmap-*
+          جایگزین کن.
+        -->
+    </platform>
+</widget>
