@@ -23,16 +23,5 @@
 
     <platform name="android">
         <allow-intent href="market:*" />
-        <!--
-          آیکون و اسپلش‌اسکرین:
-          یک آیکون مربعی 1024x1024 پیکسل بساز و در پوشه res/icon.png بگذار،
-          سپس دستور زیر را در ترمینال اجرا کن تا همه سایزها به‌صورت خودکار ساخته شوند:
-
-              npx cordova-res android --skip-config --copy
-
-          یا به‌صورت دستی فایل‌های آیکون را داخل پوشه
-          platforms/android/app/src/main/res/mipmap-*
-          جایگزین کن.
-        -->
     </platform>
 </widget>
