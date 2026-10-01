@@ -1,3 +1,4 @@
+name: 
 name: Build Release APK
 on:
   workflow_dispatch:
@@ -19,7 +20,7 @@ jobs:
       - name: Create keystore
         run: keytool -genkey -v -keystore camel.keystore -alias camel -keyalg RSA -keysize 2048 -validity 10000 -storepass Camel12345 -keypass Camel12345 -dname "CN=Camel Run, O=Farhad, C=IR"
       - name: Build release
-        run: cordova build android --release -- --keystore=$PWD/camel.keystore --storePassword=Camel12345 --alias=camel --password=Camel12345
+        run: cordova build android --release -- --packageType=apk --keystore=$PWD/camel.keystore --storePassword=Camel12345 --alias=camel --password=Camel12345
       - name: Show files
         run: find platforms -name "*.apk" -o -name "*.aab"
       - uses: actions/upload-artifact@v4
@@ -27,5 +28,4 @@ jobs:
           name: release
           path: |
             platforms/android/app/build/outputs/**/*.apk
-            platforms/android/app/build/outputs/**/*.aab
-            camel.keystore: 
+            camel.keystore
